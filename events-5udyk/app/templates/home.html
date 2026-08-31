@@ -1,20 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="board-bar">
-  <h1>The board</h1>
-  <div class="hero-actions">
-    <button class="btn" type="button" id="toggle-upload" aria-expanded="false" aria-controls="upload-panel">Upload a schedule</button>
-    <a class="btn ghost" href="/event/new">Add one event</a>
-  </div>
-</div>
-
 <section class="upload-panel" id="upload-panel" hidden>
   <div class="upload-panel-head">
-    <p class="eyebrow">Parents</p>
-    <h2>Upload a schedule</h2>
+    <p class="eyebrow">Add to the board</p>
+    <h2>New schedule</h2>
     <p class="lede">Parent → kid → team name → PDF or photo.</p>
   </div>
   {% include "_upload_form.html" %}
+  <p class="hint"><a href="/event/new">Or add a single event by hand</a></p>
 </section>
 
 {% if request.query_params.get('added') %}
@@ -53,7 +46,7 @@
 <div class="empty">
   <h2>No upcoming events yet</h2>
   <p>Upload a screenshot or PDF of a team schedule, confirm the list, and it shows up here.</p>
-  <button class="btn" type="button" onclick="document.getElementById('toggle-upload').click()">Upload a schedule</button>
+  <button class="btn" type="button" onclick="document.getElementById('nav-add').click()">Add a schedule</button>
 </div>
 {% endif %}
 
@@ -97,19 +90,29 @@ function copyCal() {
   });
 }
 (function () {
-  const btn = document.getElementById('toggle-upload');
   const panel = document.getElementById('upload-panel');
-  if (!btn || !panel) return;
-  function open() {
+  const navAdd = document.getElementById('nav-add');
+  const navBoard = document.getElementById('nav-board');
+  if (!panel || !navAdd) return;
+  function setNav(addOn) {
+    navAdd.classList.toggle('on', addOn);
+    if (navBoard) navBoard.classList.toggle('on', !addOn);
+  }
+  function open(e) {
+    if (e) e.preventDefault();
     panel.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
+    setNav(true);
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function close() {
     panel.hidden = true;
-    btn.setAttribute('aria-expanded', 'false');
+    setNav(false);
   }
-  btn.addEventListener('click', () => panel.hidden ? open() : close());
+  navAdd.addEventListener('click', (e) => {
+    if (!panel.hidden) { e.preventDefault(); close(); }
+    else open(e);
+  });
+  if (navBoard) navBoard.addEventListener('click', close);
   if (location.hash === '#upload' || new URLSearchParams(location.search).has('upload')) open();
 })();
 </script>

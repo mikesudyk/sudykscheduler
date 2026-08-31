@@ -21,15 +21,16 @@
       </span>
     </a>
     <nav>
-      <a href="/">Board</a>
-      <a href="/#upload">Upload</a>
-      <a href="/event/new">One event</a>
-      <a href="/logout" class="quiet">Log out</a>
+      <a href="/" id="nav-board" class="{% if request.url.path == '/' %}on{% endif %}">Board</a>
+      <a href="/#upload" id="nav-add" class="{% if request.url.path.startswith('/add') %}on{% endif %}">Add</a>
     </nav>
   </header>
   {% endif %}
   <main class="{% block mainclass %}{% endblock %}">
     {% block content %}{% endblock %}
   </main>
+  {% if logged_in %}
+  <footer class="foot"><a href="/logout">Log out</a></footer>
+  {% endif %}
 </body>
 </html>

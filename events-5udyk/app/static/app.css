@@ -49,10 +49,12 @@ a { color: inherit; }
   background: var(--accent); color: var(--accent-ink);
   display: grid; place-items: center; font-family: "Bebas Neue", sans-serif; font-size: 1.4rem;
 }
-nav { display: flex; gap: .85rem; font-size: .92rem; }
-nav a { text-decoration: none; }
-nav .quiet { color: var(--muted); }
-main { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 4rem; }
+nav { display: flex; gap: .35rem; font-size: .95rem; }
+nav a { text-decoration: none; padding: .35rem .7rem; border-radius: 999px; color: var(--muted); }
+nav a.on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+main { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding: 1rem 0 3rem; }
+.foot { width: min(780px, calc(100% - 2rem)); margin: 0 auto 1.5rem; font-size: .8rem; }
+.foot a { color: var(--muted); }
 .center-page { min-height: 100vh; display: grid; place-items: center; width: min(920px, calc(100% - 1.5rem)); }
 .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: end; margin-bottom: 1.25rem; flex-wrap: wrap; }
 .hero.compact { margin-bottom: .8rem; }
@@ -125,13 +127,18 @@ button, .btn {
 .filters.tight { margin-bottom: 1.2rem; }
 .chip {
   text-decoration: none;
-  border: 1px solid var(--line);
-  background: var(--card);
+  border: 1.5px solid var(--kid, var(--line));
+  background: color-mix(in srgb, var(--kid, var(--card)) 22%, var(--card));
+  color: var(--ink);
   padding: .35rem .7rem;
   border-radius: 999px;
   font-size: .9rem;
 }
-.chip.on { background: var(--kid, var(--accent)); color: #fff; border-color: transparent; }
+.chip.on {
+  background: var(--kid, var(--accent));
+  color: #fff;
+  border-color: var(--kid, var(--accent));
+}
 .dot { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; }
 .dot.lg { width: 1rem; height: 1rem; }
 .events { list-style: none; padding: 0; margin: 0 0 1.4rem; display: grid; gap: .5rem; }
