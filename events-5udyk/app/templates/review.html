@@ -6,6 +6,8 @@
     <p class="eyebrow">{{ kid.name }}{% if kid.parent %} · {{ kid.parent }}{% endif %}</p>
     <h1>Confirm these events</h1>
     <p class="lede">{{ payload.summary or "Check each one. Uncheck anything that should not go on the board. Fix dates and times before you confirm." }}</p>
+    {% if payload.reader %}<p class="hint">Reader: {{ payload.reader }}</p>{% endif %}
+    {% if payload.error %}<p class="error">{{ payload.error }}</p>{% endif %}
   </div>
 </section>
 

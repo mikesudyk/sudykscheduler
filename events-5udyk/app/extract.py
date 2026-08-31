@@ -66,11 +66,15 @@ def pdf_text(path: Path) -> str:
         return ""
 
 
+def _clean_key(raw: str) -> str:
+    return raw.strip().strip('"').strip("'")
+
+
 def _api_config() -> tuple[str, str, str] | None:
-    xai = os.getenv("XAI_API_KEY", "").strip()
+    xai = _clean_key(os.getenv("XAI_API_KEY", ""))
     if xai:
-        return "https://api.x.ai/v1/chat/completions", xai, os.getenv("XAI_MODEL", "grok-4")
-    oai = os.getenv("OPENAI_API_KEY", "").strip()
+        return "https://api.x.ai/v1/chat/completions", xai, os.getenv("XAI_MODEL", "grok-4.6").strip() or "grok-4.6"
+    oai = _clean_key(os.getenv("OPENAI_API_KEY", ""))
     if oai:
         return "https://api.openai.com/v1/chat/completions", oai, os.getenv("OPENAI_MODEL", "gpt-4o")
     return None
@@ -116,18 +120,15 @@ def extract_schedule(
 ) -> dict:
     cfg = _api_config()
     text = pdf_text(path) if path.suffix.lower() == ".pdf" else ""
-    parsed = parse_schedule_text(text, kid_name, team_name, sport) if text else None
 
     if not cfg:
-        if parsed and parsed.get("events"):
-            return parsed
         return _empty_result(
-            "No AI key configured. Add events by hand on the next screen, or set XAI_API_KEY."
+            "Grok API key is not set on Railway (XAI_API_KEY). Add the key from console.x.ai and redeploy."
         )
 
-    url, key, model = cfg
+    url, api_key, model = cfg
     prompt = EXTRACT_PROMPT
-    for key, value in {
+    for field, value in {
         "kid_name": kid_name,
         "timezone": timezone,
         "parent_name": parent_name or "unknown",
@@ -135,7 +136,7 @@ def extract_schedule(
         "team_name": team_name or "not specified",
         "extra_notes": extra_notes or "none",
     }.items():
-        prompt = prompt.replace("{" + key + "}", str(value).replace("{", "(").replace("}", ")"))
+        prompt = prompt.replace("{" + field + "}", str(value).replace("{", "(").replace("}", ")"))
     user_content: list[dict] = [{"type": "text", "text": prompt}]
     if text:
         user_content.append({"type": "text", "text": "Extracted PDF text:\n" + text[:12000]})
@@ -159,40 +160,49 @@ def extract_schedule(
             }
         )
 
-    try:
-        r = httpx.post(
-            url,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            json={
-                "model": model,
-                "temperature": 0.1,
-                "messages": [
-                    {"role": "system", "content": "You extract structured sports schedules. JSON only."},
-                    {"role": "user", "content": user_content},
-                ],
-            },
-            timeout=90.0,
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"]
-        ai = _parse_json(content)
-        ai = _filter_to_team(ai, team_name)
-        if _events_have_dates(ai):
-            if parsed and parsed.get("events") and len(parsed["events"]) > len(ai.get("events") or []):
-                parsed["summary"] = (ai.get("summary") or parsed["summary"]) + " (used the printed table; it had more complete rows.)"
-                return parsed
+    models = []
+    for m in (model, "grok-4.6", "grok-4.5"):
+        if m and m not in models:
+            models.append(m)
+
+    last_err = None
+    for try_model in models:
+        try:
+            r = httpx.post(
+                url,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": try_model,
+                    "temperature": 0.1,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": "You extract structured youth sports schedules. Return only JSON."},
+                        {"role": "user", "content": user_content},
+                    ],
+                },
+                timeout=90.0,
+            )
+            print(f"xAI {try_model} HTTP {r.status_code} {r.text[:400]}", flush=True)
+            if r.status_code >= 400:
+                last_err = f"{try_model} HTTP {r.status_code}: {r.text[:300]}"
+                continue
+            content = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+            if not content:
+                last_err = f"{try_model} returned empty content"
+                continue
+            ai = _parse_json(content)
+            ai = _filter_to_team(ai, team_name)
+            ai["reader"] = f"grok:{try_model}"
             return ai
-        if parsed and parsed.get("events"):
-            parsed["summary"] = "Read the printed table. Confirm opponents and fields."
-            return parsed
-        return ai
-    except Exception as exc:
-        if parsed and parsed.get("events"):
-            parsed["error"] = str(exc)
-            return parsed
-        fallback = _empty_result(f"AI read failed: {exc}")
-        fallback["error"] = str(exc)
-        return fallback
+        except Exception as exc:
+            last_err = f"{try_model}: {exc}"
+            print(f"xAI error {last_err}", flush=True)
+            continue
+
+    fallback = _empty_result(f"Grok API did not return a schedule. {last_err}")
+    fallback["error"] = last_err
+    fallback["reader"] = "failed"
+    return fallback
 
 
 def _parse_json(content: str) -> dict:

@@ -31,7 +31,7 @@ from .db import (
     save_extraction,
     seed_roster_if_empty,
 )
-from .extract import extract_schedule
+from .extract import extract_schedule, _api_config
 from .icsutil import build_calendar, event_google_url
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -144,7 +144,13 @@ def login_submit(request: Request, password: str = Form(...)):
 
 @app.get("/health")
 def health():
-    return {"ok": True, "data_dir": str(DATA_DIR)}
+    cfg = _api_config()
+    return {
+        "ok": True,
+        "data_dir": str(DATA_DIR),
+        "grok": bool(cfg and "x.ai" in cfg[0]),
+        "model": cfg[2] if cfg else None,
+    }
 
 
 @app.get("/logout")
