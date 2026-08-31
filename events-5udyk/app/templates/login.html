@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}{{ app_name }}{% endblock %}
+{% block bodyclass %}splash{% endblock %}
+{% block mainclass %}center-page{% endblock %}
+{% block content %}
+<section class="ticket">
+  <div class="ticket-side">
+    <p class="season">Family season pass</p>
+    <p class="wordmark">SUDYK</p>
+    <p class="submark">Spectator Scheduler</p>
+    <p class="gate">events.5udyk.com · grandkids on the field</p>
+  </div>
+  <div class="ticket-body">
+    <p class="eyebrow">Gate check</p>
+    <h1>Find a seat.</h1>
+    <p class="lede">Games, practices, and the rest of the chaos — one board for the whole crew.</p>
+    <form method="post" action="/login" class="stack">
+      <label>
+        Crew password
+        <input type="password" name="password" autofocus required autocomplete="current-password" placeholder="••••••••">
+      </label>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <button type="submit">Enter the stands</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}New event · {{ family }} Events{% endblock %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">One-off</p>
+    <h1>Add a single event</h1>
+  </div>
+</section>
+<form method="post" action="/event/new" class="card stack">
+  <label>
+    Grandkid
+    <select name="kid_id" required>
+      {% for group in kid_groups %}
+      <optgroup label="{{ group.parent }}">
+        {% for k in group.kids %}
+        <option value="{{ k.id }}">{{ k.name }}</option>
+        {% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    Title
+    <input type="text" name="title" required placeholder="Soccer vs Hawks">
+  </label>
+  <label>
+    Type
+    <select name="event_type">
+      <option>game</option>
+      <option>practice</option>
+      <option>tournament</option>
+      <option>other</option>
+    </select>
+  </label>
+  <div class="grid-2">
+    <label>Date <input type="date" name="date" required></label>
+    <label>Start <input type="time" name="start_time"></label>
+  </div>
+  <div class="grid-2">
+    <label>End <input type="time" name="end_time"></label>
+    <label>Location <input type="text" name="location"></label>
+  </div>
+  <label>Opponent <input type="text" name="opponent"></label>
+  <label>Notes <input type="text" name="notes"></label>
+  <button type="submit">Save event</button>
+</form>
+{% endblock %}

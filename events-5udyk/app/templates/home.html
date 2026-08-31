@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Upcoming</p>
+    <h1>The board</h1>
+    <p class="lede">Everything on the schedule. Tap an event to drop it on your own calendar.</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn" href="/add">Upload a schedule</a>
+    <a class="btn ghost" href="/event/new">Add one event</a>
+  </div>
+</section>
+
+{% if request.query_params.get('added') %}
+<p class="flash">Confirmed {{ request.query_params.get('added') }} event{{ 's' if request.query_params.get('added') != '1' else '' }}. They’re on the board.</p>
+{% endif %}
+
+<div class="filters">
+  <a class="chip {% if not active_kid and not active_parent %}on{% endif %}" href="/">Everyone</a>
+  {% for group in kid_groups %}
+  <a class="chip {% if active_parent == group.parent %}on{% endif %}" href="/?parent={{ group.parent }}" style="--kid: {{ group.kids[0].color }}">{{ group.parent }}</a>
+  {% endfor %}
+</div>
+<div class="filters tight">
+  {% for k in kids %}
+    {% if not active_parent or k.parent == active_parent %}
+    <a class="chip {% if active_kid == k.id %}on{% endif %}" href="/?kid={{ k.id }}" style="--kid: {{ k.color }}">{{ k.name }}</a>
+    {% endif %}
+  {% endfor %}
+</div>
+
+{% if events %}
+<div class="cal-actions">
+  <p>Subscribe to the whole board if you want new games to land on your phone automatically.</p>
+  <div class="row">
+    <a class="btn small" href="{{ calendar_url if not kid_calendar_url else kid_calendar_url }}">Download season .ics</a>
+    <button class="btn small ghost" type="button" onclick="copyCal()">Copy subscribe link</button>
+  </div>
+  <p class="hint" id="copied" hidden>Copied. Google Calendar → Settings → Add calendar → From URL. iPhone Calendar → Add Calendar → Add Subscription Calendar.</p>
+</div>
+{% endif %}
+
+{% if not grouped %}
+<div class="empty">
+  <h2>No upcoming events yet</h2>
+  <p>Upload a screenshot or PDF of a team schedule. Add the team name, answer a couple questions, confirm the list, and it shows up here.</p>
+  <a class="btn" href="/add">Upload a schedule</a>
+</div>
+{% endif %}
+
+{% for day in grouped %}
+<section class="day">
+  <h2>{{ day.label }}</h2>
+  <ul class="events">
+    {% for e in day.events %}
+    <li>
+      <span class="dot" style="background: {{ e.kid_color }}"></span>
+      <div class="ev-main">
+        <strong>{{ e.title }}</strong>
+        <span class="meta">
+          {{ e.kid_name }}{% if e.parent_name %} · {{ e.parent_name }}’s{% endif %}
+          · {{ e.time_label }}
+          {% if e.event_type and e.event_type != 'event' %} · {{ e.event_type }}{% endif %}
+          {% if e.location %} · {{ e.location }}{% endif %}
+          {% if e.opponent %} · vs {{ e.opponent }}{% endif %}
+        </span>
+        {% if e.notes %}<span class="meta">{{ e.notes }}</span>{% endif %}
+        <div class="ev-cal">
+          <a href="{{ e.google_url }}" target="_blank" rel="noopener">Google Calendar</a>
+          <a href="{{ e.ics_url }}">Apple / Outlook (.ics)</a>
+        </div>
+      </div>
+      <form method="post" action="/events/{{ e.id }}/delete" onsubmit="return confirm('Remove this event?')">
+        <button class="icon-btn" type="submit" title="Remove">×</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+
+<script>
+function copyCal() {
+  const url = location.origin + "{{ kid_calendar_url or calendar_url }}";
+  navigator.clipboard.writeText(url).then(() => {
+    document.getElementById('copied').hidden = false;
+  });
+}
+</script>
+{% endblock %}
