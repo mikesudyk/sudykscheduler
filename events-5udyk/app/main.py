@@ -265,26 +265,44 @@ async def add_upload_file(
 
     stored = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(4)}{suffix}"
     dest = UPLOAD_DIR / stored
-    dest.write_bytes(await file.read())
-    upload_id = add_upload(kid_id, stored, file.filename or stored, file.content_type or "")
-
-    result = extract_schedule(
-        dest,
-        file.content_type or "",
-        kid["name"],
-        TIMEZONE,
-        parent_name=kid.get("parent") or "",
-        sport=sport.strip(),
-        team_name=team_name.strip(),
-        extra_notes=extra_notes.strip(),
-    )
-    if team_name.strip():
-        result["team_name"] = result.get("team_name") or team_name.strip()
-    if sport.strip():
-        result["sport"] = sport.strip()
-    result["parent_notes"] = extra_notes.strip()
-    save_extraction(upload_id, result, status="extracted")
-    return RedirectResponse(f"/review/{upload_id}", status_code=303)
+    try:
+        raw = await file.read()
+        if len(raw) > 12 * 1024 * 1024:
+            return templates.TemplateResponse(
+                request,
+                "add.html",
+                ctx(request, error="That file is too big. Save one week or print-to-PDF again."),
+                status_code=400,
+            )
+        dest.write_bytes(raw)
+        upload_id = add_upload(kid_id, stored, file.filename or stored, file.content_type or "")
+        result = extract_schedule(
+            dest,
+            file.content_type or "",
+            kid["name"],
+            TIMEZONE,
+            parent_name=kid.get("parent") or "",
+            sport=sport.strip(),
+            team_name=team_name.strip(),
+            extra_notes=extra_notes.strip(),
+        )
+        if team_name.strip():
+            result["team_name"] = result.get("team_name") or team_name.strip()
+        if sport.strip():
+            result["sport"] = sport.strip()
+        result["parent_notes"] = extra_notes.strip()
+        save_extraction(upload_id, result, status="extracted")
+        return RedirectResponse(f"/review/{upload_id}", status_code=303)
+    except Exception as exc:
+        return templates.TemplateResponse(
+            request,
+            "add.html",
+            ctx(
+                request,
+                error=f"Could not read that file. Try a screenshot or a simpler PDF. ({exc})",
+            ),
+            status_code=500,
+        )
 
 
 @app.get("/review/{upload_id}", response_class=HTMLResponse)

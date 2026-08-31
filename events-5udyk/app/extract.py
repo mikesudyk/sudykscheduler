@@ -123,14 +123,16 @@ def extract_schedule(
         return guessed
 
     url, key, model = cfg
-    prompt = EXTRACT_PROMPT.format(
-        kid_name=kid_name,
-        timezone=timezone,
-        parent_name=parent_name or "unknown",
-        sport=sport or "not specified",
-        team_name=team_name or "not specified",
-        extra_notes=extra_notes or "none",
-    )
+    prompt = EXTRACT_PROMPT
+    for key, value in {
+        "kid_name": kid_name,
+        "timezone": timezone,
+        "parent_name": parent_name or "unknown",
+        "sport": sport or "not specified",
+        "team_name": team_name or "not specified",
+        "extra_notes": extra_notes or "none",
+    }.items():
+        prompt = prompt.replace("{" + key + "}", str(value).replace("{", "(").replace("}", ")"))
     user_content: list[dict] = [{"type": "text", "text": prompt}]
     if text:
         user_content.append({"type": "text", "text": "Extracted PDF text:\n" + text[:12000]})
