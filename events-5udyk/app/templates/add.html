@@ -1,82 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Upload · {{ app_name }}{% endblock %}
 {% block content %}
-<section class="hero">
+<section class="hero compact">
   <div>
     <p class="eyebrow">Parents</p>
     <h1>Upload a schedule</h1>
-    <p class="lede">Pick the parent first, then the grandkid, then the photo or PDF. A team name helps the reader make sense of a messy screenshot.</p>
   </div>
 </section>
-
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
-
-<form method="post" action="/add" enctype="multipart/form-data" class="stack" id="upload-form">
-  <fieldset class="kid-picker">
-    <legend>Whose household?</legend>
-    <div class="picker-grid">
-      {% for group in kid_groups %}
-      <label class="pick">
-        <input type="radio" name="parent_name" value="{{ group.parent }}" required>
-        <span class="dot" style="background: {{ group.kids[0].color }}"></span>
-        {{ group.parent }}
-      </label>
-      {% endfor %}
-    </div>
-  </fieldset>
-
-  <fieldset class="kid-picker" id="kid-field" hidden>
-    <legend>Which grandkid?</legend>
-    <div class="picker-grid">
-      {% for k in kids %}
-      <label class="pick kid-opt" data-parent="{{ k.parent }}">
-        <input type="radio" name="kid_id" value="{{ k.id }}">
-        <span class="dot" style="background: {{ k.color }}"></span>
-        {{ k.name }}
-      </label>
-      {% endfor %}
-    </div>
-  </fieldset>
-
-  <div class="grid-2">
-    <label>
-      Sport
-      <input type="text" name="sport" placeholder="Soccer, baseball…">
-    </label>
-    <label>
-      Team name
-      <input type="text" name="team_name" placeholder="Hawks U10, school team…">
-    </label>
-  </div>
-  <label>
-    Anything else we should know
-    <input type="text" name="extra_notes" placeholder="Fall 2026 rec league, times are arrival not kickoff…">
-  </label>
-
-  <label class="drop">
-    <input type="file" name="file" required accept="image/*,application/pdf,.heic">
-    <strong>Photo or PDF of the schedule</strong>
-    <span>TeamSnap screenshot, printed league PDF, or a picture of the paper on the fridge.</span>
-  </label>
-
-  <button type="submit">Read this schedule</button>
-  <p class="hint">Next it will ask anything it can’t read, then you’ll confirm each event before it hits the board.</p>
-</form>
-
-<script>
-const form = document.getElementById('upload-form');
-const kidField = document.getElementById('kid-field');
-form.querySelectorAll('input[name="parent_name"]').forEach(radio => {
-  radio.addEventListener('change', () => {
-    kidField.hidden = false;
-    form.querySelectorAll('.kid-opt').forEach(opt => {
-      const match = opt.dataset.parent === radio.value;
-      opt.hidden = !match;
-      const input = opt.querySelector('input');
-      input.required = match;
-      if (!match) input.checked = false;
-    });
-  });
-});
-</script>
+{% include "_upload_form.html" %}
 {% endblock %}

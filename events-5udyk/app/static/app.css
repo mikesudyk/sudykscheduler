@@ -55,7 +55,37 @@ nav .quiet { color: var(--muted); }
 main { width: min(780px, calc(100% - 2rem)); margin: 0 auto; padding: 1.5rem 0 4rem; }
 .center-page { min-height: 100vh; display: grid; place-items: center; width: min(920px, calc(100% - 1.5rem)); }
 .hero { display: flex; justify-content: space-between; gap: 1rem; align-items: end; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.hero.compact { margin-bottom: .8rem; }
 .hero-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.board-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin: 0 0 .85rem;
+}
+.board-bar h1 { font-size: 1.85rem; margin: 0; }
+.upload-panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 1.1rem;
+  padding: 1rem 1rem 1.15rem;
+  margin: 0 0 1.1rem;
+  box-shadow: var(--shadow);
+}
+.upload-panel-head { margin-bottom: .75rem; }
+.upload-panel-head h2 { margin: 0 0 .2rem; font-size: 1.35rem; }
+.cal-mini { margin: 0 0 1rem; }
+.cal-mini summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: .88rem;
+  list-style: none;
+}
+.cal-mini summary::-webkit-details-marker { display: none; }
+.cal-mini[open] summary { margin-bottom: .45rem; }
+.cal-mini .cal-actions { margin: 0; }
 .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: .7rem; color: var(--accent); margin: 0 0 .35rem; }
 .lede { color: var(--muted); margin: 0; max-width: 36rem; line-height: 1.45; }
 .card, .empty, .cal-actions, .events li {

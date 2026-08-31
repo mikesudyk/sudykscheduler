@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="hero">
-  <div>
-    <p class="eyebrow">Upcoming</p>
-    <h1>The board</h1>
-    <p class="lede">Everything on the schedule. Tap an event to drop it on your own calendar.</p>
-  </div>
+<div class="board-bar">
+  <h1>The board</h1>
   <div class="hero-actions">
-    <a class="btn" href="/add">Upload a schedule</a>
+    <button class="btn" type="button" id="toggle-upload" aria-expanded="false" aria-controls="upload-panel">Upload a schedule</button>
     <a class="btn ghost" href="/event/new">Add one event</a>
   </div>
+</div>
+
+<section class="upload-panel" id="upload-panel" hidden>
+  <div class="upload-panel-head">
+    <p class="eyebrow">Parents</p>
+    <h2>Upload a schedule</h2>
+    <p class="lede">Parent → kid → team name → PDF or photo.</p>
+  </div>
+  {% include "_upload_form.html" %}
 </section>
 
 {% if request.query_params.get('added') %}
@@ -31,21 +36,24 @@
 </div>
 
 {% if events %}
-<div class="cal-actions">
-  <p>Subscribe to the whole board if you want new games to land on your phone automatically.</p>
-  <div class="row">
-    <a class="btn small" href="{{ calendar_url if not kid_calendar_url else kid_calendar_url }}">Download season .ics</a>
-    <button class="btn small ghost" type="button" onclick="copyCal()">Copy subscribe link</button>
+<details class="cal-mini">
+  <summary>Add these games to your phone calendar</summary>
+  <div class="cal-actions">
+    <p>Subscribe once and new games show up automatically.</p>
+    <div class="row">
+      <a class="btn small" href="{{ calendar_url if not kid_calendar_url else kid_calendar_url }}">Download season .ics</a>
+      <button class="btn small ghost" type="button" onclick="copyCal()">Copy subscribe link</button>
+    </div>
+    <p class="hint" id="copied" hidden>Copied. Google Calendar → Settings → Add calendar → From URL. iPhone Calendar → Add Calendar → Add Subscription Calendar.</p>
   </div>
-  <p class="hint" id="copied" hidden>Copied. Google Calendar → Settings → Add calendar → From URL. iPhone Calendar → Add Calendar → Add Subscription Calendar.</p>
-</div>
+</details>
 {% endif %}
 
 {% if not grouped %}
 <div class="empty">
   <h2>No upcoming events yet</h2>
-  <p>Upload a screenshot or PDF of a team schedule. Add the team name, answer a couple questions, confirm the list, and it shows up here.</p>
-  <a class="btn" href="/add">Upload a schedule</a>
+  <p>Upload a screenshot or PDF of a team schedule, confirm the list, and it shows up here.</p>
+  <button class="btn" type="button" onclick="document.getElementById('toggle-upload').click()">Upload a schedule</button>
 </div>
 {% endif %}
 
@@ -84,8 +92,25 @@
 function copyCal() {
   const url = location.origin + "{{ kid_calendar_url or calendar_url }}";
   navigator.clipboard.writeText(url).then(() => {
-    document.getElementById('copied').hidden = false;
+    const el = document.getElementById('copied');
+    if (el) el.hidden = false;
   });
 }
+(function () {
+  const btn = document.getElementById('toggle-upload');
+  const panel = document.getElementById('upload-panel');
+  if (!btn || !panel) return;
+  function open() {
+    panel.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function close() {
+    panel.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+  }
+  btn.addEventListener('click', () => panel.hidden ? open() : close());
+  if (location.hash === '#upload' || new URLSearchParams(location.search).has('upload')) open();
+})();
 </script>
 {% endblock %}
