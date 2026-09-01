@@ -199,7 +199,7 @@ def extract_schedule(
                         {"role": "user", "content": user_content},
                     ],
                 },
-                timeout=90.0,
+                timeout=httpx.Timeout(15.0, read=75.0, write=30.0, pool=15.0),
             )
             print(f"xAI {try_model} HTTP {r.status_code} {r.text[:400]}", flush=True)
             if r.status_code >= 400:

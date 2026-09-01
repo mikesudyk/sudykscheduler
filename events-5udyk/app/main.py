@@ -282,37 +282,42 @@ async def add_upload_file(
                 status_code=400,
             )
         dest.write_bytes(raw)
-        upload_id = add_upload(kid_id, stored, file.filename or stored, file.content_type or "")
+        mime = file.content_type or ""
+        original = file.filename or stored
+        kid_name = kid["name"]
+        parent_name = kid.get("parent") or ""
+        sport_s = sport.strip()
+        team_s = team_name.strip()
+        notes_s = extra_notes.strip()
+        upload_id = add_upload(kid_id, stored, original, mime)
         save_extraction(
             upload_id,
-            {
-                "pending": True,
-                "sport": sport.strip(),
-                "team_name": team_name.strip(),
-                "parent_notes": extra_notes.strip(),
-            },
+            {"pending": True, "sport": sport_s, "team_name": team_s, "parent_notes": notes_s},
             status="pending",
         )
 
         def _run():
+            print(f"extract start upload={upload_id} file={dest} bytes={dest.stat().st_size}", flush=True)
             try:
                 result = extract_schedule(
                     dest,
-                    file.content_type or "",
-                    kid["name"],
+                    mime,
+                    kid_name,
                     TIMEZONE,
-                    parent_name=kid.get("parent") or "",
-                    sport=sport.strip(),
-                    team_name=team_name.strip(),
-                    extra_notes=extra_notes.strip(),
+                    parent_name=parent_name,
+                    sport=sport_s,
+                    team_name=team_s,
+                    extra_notes=notes_s,
                 )
-                if team_name.strip():
-                    result["team_name"] = result.get("team_name") or team_name.strip()
-                if sport.strip():
-                    result["sport"] = sport.strip()
-                result["parent_notes"] = extra_notes.strip()
+                if team_s:
+                    result["team_name"] = result.get("team_name") or team_s
+                if sport_s:
+                    result["sport"] = sport_s
+                result["parent_notes"] = notes_s
                 save_extraction(upload_id, result, status="extracted")
+                print(f"extract done upload={upload_id} reader={result.get('reader')}", flush=True)
             except Exception as exc:
+                print(f"extract fail upload={upload_id} {exc}", flush=True)
                 save_extraction(
                     upload_id,
                     {
