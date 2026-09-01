@@ -230,6 +230,63 @@ def extract_schedule(
     return fallback
 
 
+def refine_with_answers(payload: dict, answers: dict, kid_name: str, sport: str = "", team_name: str = "") -> dict:
+    """Second Grok pass: apply parent answers to the already-extracted events."""
+    cfg = _api_config()
+    if not cfg:
+        payload["answers"] = answers
+        payload["refined"] = True
+        return payload
+    url, api_key, model = cfg
+    prompt = (
+        f"You already extracted a youth sports schedule for {kid_name}. "
+        f"Sport: {sport or payload.get('sport') or 'unknown'}. "
+        f"Team: {team_name or payload.get('team_name') or 'unknown'}.\n"
+        "The parent answered your clarifying questions. Apply those answers to EVERY event "
+        "they affect. Examples: a home-field address goes on home games; arrival vs start "
+        "time shifts start_time; a missing year fills date.\n"
+        "Do not drop events. Do not invent new games. Keep the same JSON shape "
+        "(summary, sport, team_name, season, questions, events).\n"
+        "Leave questions as an empty list.\n"
+        "Put ISO dates in date and 24-hour HH:MM in start_time/end_time.\n\n"
+        f"Answers:\n{json.dumps(answers, indent=2)}\n\n"
+        f"Current extraction:\n{json.dumps({k: payload.get(k) for k in ('summary','sport','team_name','season','events')}, indent=2)}"
+    )
+    try:
+        r = httpx.post(
+            url,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": model or "grok-4.6",
+                "temperature": 0.1,
+                "reasoning_effort": "low",
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": "Update sports schedule JSON using parent answers. JSON only."},
+                    {"role": "user", "content": prompt},
+                ],
+            },
+            timeout=httpx.Timeout(15.0, read=60.0, write=20.0, pool=15.0),
+        )
+        print(f"xAI refine HTTP {r.status_code} {r.text[:300]}", flush=True)
+        r.raise_for_status()
+        content = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
+        updated = _parse_json(content)
+        updated["answers"] = answers
+        updated["refined"] = True
+        updated["questions"] = []
+        updated["reader"] = f"grok-refine:{model}"
+        if not updated.get("events"):
+            updated["events"] = payload.get("events") or []
+        return updated
+    except Exception as exc:
+        print(f"xAI refine error {exc}", flush=True)
+        payload["answers"] = answers
+        payload["refined"] = True
+        payload["refine_error"] = str(exc)
+        return payload
+
+
 def _parse_json(content: str) -> dict:
     content = content.strip()
     if content.startswith("```"):

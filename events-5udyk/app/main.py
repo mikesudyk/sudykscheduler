@@ -32,7 +32,7 @@ from .db import (
     save_extraction,
     seed_roster_if_empty,
 )
-from .extract import extract_schedule, _api_config
+from .extract import extract_schedule, refine_with_answers, _api_config
 from .icsutil import build_calendar, event_google_url
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -367,6 +367,37 @@ def review_page(request: Request, upload_id: int):
         "review.html",
         ctx(request, upload=upload, kid=kid, payload=payload),
     )
+
+
+@app.post("/review/{upload_id}/refine")
+async def review_refine(request: Request, upload_id: int):
+    gate = require_login(request)
+    if gate:
+        return gate
+    upload = get_upload(upload_id)
+    if not upload:
+        return RedirectResponse("/", status_code=303)
+    form = await request.form()
+    answers = {}
+    for k, v in form.items():
+        if not k.startswith("q_"):
+            continue
+        val = str(v).strip()
+        if val:
+            answers[k[2:]] = val
+    import json
+
+    payload = json.loads(upload["extraction_json"] or "{}")
+    kid = get_kid(upload["kid_id"]) or {}
+    updated = refine_with_answers(
+        payload,
+        answers,
+        kid.get("name") or "",
+        sport=payload.get("sport") or "",
+        team_name=payload.get("team_name") or "",
+    )
+    save_extraction(upload_id, updated, status="extracted")
+    return RedirectResponse(f"/review/{upload_id}", status_code=303)
 
 
 @app.post("/review/{upload_id}")

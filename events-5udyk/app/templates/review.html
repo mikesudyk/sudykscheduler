@@ -4,10 +4,17 @@
 <section class="hero">
   <div>
     <p class="eyebrow">{{ kid.name }}{% if kid.parent %} · {{ kid.parent }}{% endif %}</p>
-    <h1>Confirm these events</h1>
-    <p class="lede">{{ payload.summary or "Check each one. Uncheck anything that should not go on the board. Fix dates and times before you confirm." }}</p>
+    <h1>{% if payload.questions and not payload.refined %}A few questions first{% else %}Confirm these events{% endif %}</h1>
+    <p class="lede">
+      {% if payload.questions and not payload.refined %}
+      Answer these, then Grok will fill in the games (home field, times, etc.) before you confirm.
+      {% else %}
+      {{ payload.summary or "Check each one. Uncheck anything that should not go on the board. Fix dates and times before you confirm." }}
+      {% endif %}
+    </p>
     {% if payload.reader %}<p class="hint">Reader: {{ payload.reader }}</p>{% endif %}
     {% if payload.error %}<p class="error">{{ payload.error }}</p>{% endif %}
+    {% if payload.refine_error %}<p class="hint">Could not auto-apply answers ({{ payload.refine_error }}). Edit the fields below.</p>{% endif %}
   </div>
 </section>
 
@@ -15,8 +22,8 @@
 <p class="pill">{{ payload.sport }}{% if payload.team_name %} · {{ payload.team_name }}{% endif %}{% if payload.season %} · {{ payload.season }}{% endif %}</p>
 {% endif %}
 
-<form method="post" action="/review/{{ upload.id }}" class="stack">
-  {% if payload.questions %}
+{% if payload.questions and not payload.refined %}
+<form method="post" action="/review/{{ upload.id }}/refine" class="stack">
   <section class="card">
     <h2>Clarifying questions</h2>
     {% for q in payload.questions %}
@@ -37,8 +44,10 @@
     </label>
     {% endfor %}
   </section>
-  {% endif %}
-
+  <button type="submit">Apply answers and build the games</button>
+</form>
+{% else %}
+<form method="post" action="/review/{{ upload.id }}" class="stack">
   <input type="hidden" name="event_count" value="{{ payload.events|length }}">
 
   {% if payload.events %}
@@ -102,4 +111,5 @@
   </div>
   {% endif %}
 </form>
+{% endif %}
 {% endblock %}
