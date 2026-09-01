@@ -99,9 +99,31 @@ def init_db() -> None:
         cols = {row[1] for row in conn.execute("PRAGMA table_info(kids)")}
         if "parent" not in cols:
             conn.execute("ALTER TABLE kids ADD COLUMN parent TEXT")
+        if "family" not in cols:
+            conn.execute("ALTER TABLE kids ADD COLUMN family TEXT")
+        conn.execute(
+            """UPDATE kids SET family = 'Sudyk'
+               WHERE family IS NULL OR trim(family) = ''"""
+        )
 
 
 PARENT_ORDER = ["Mike", "Laura", "Jen", "Dave"]
+SUDYK_PARENTS = {"Mike", "Laura", "Jen", "Dave"}
+FAMILIES = ["Sudyk", "Vander Veen"]
+
+
+def infer_family(parent: str | None, family: str | None = None) -> str:
+    if family and family.strip():
+        name = family.strip()
+        low = name.lower().replace(" ", "")
+        if "vander" in low:
+            return "Vander Veen"
+        if "sudyk" in low:
+            return "Sudyk"
+        return name
+    if (parent or "").strip() in SUDYK_PARENTS:
+        return "Sudyk"
+    return "Sudyk"
 
 
 def now_iso() -> str:
@@ -134,16 +156,19 @@ def add_kid(
     color: str,
     short_name: str | None = None,
     parent: str | None = None,
+    family: str | None = None,
 ) -> int:
+    fam = infer_family(parent, family)
     with db() as conn:
         cur = conn.execute(
-            """INSERT INTO kids (name, short_name, color, parent, sort_order, created_at)
-               VALUES (?, ?, ?, ?, COALESCE((SELECT MAX(sort_order)+1 FROM kids), 1), ?)""",
+            """INSERT INTO kids (name, short_name, color, parent, family, sort_order, created_at)
+               VALUES (?, ?, ?, ?, ?, COALESCE((SELECT MAX(sort_order)+1 FROM kids), 1), ?)""",
             (
                 name.strip(),
                 (short_name or "").strip() or None,
                 color,
                 (parent or "").strip() or None,
+                fam,
                 now_iso(),
             ),
         )
@@ -209,7 +234,8 @@ def import_kids_csv(text: str) -> dict:
                 skipped += 1
                 continue
             short_name = pick(row, "short_name", "short", "nickname", "nick") or None
-            parent = pick(row, "parent", "household", "family") or None
+            parent = pick(row, "parent", "household") or None
+            family = infer_family(parent, pick(row, "family", "side", "crew") or None)
             color = pick(row, "color", "hex", "colour")
             if color and not color.startswith("#"):
                 color = "#" + color
@@ -217,9 +243,9 @@ def import_kids_csv(text: str) -> dict:
                 color = DEFAULT_COLORS[color_i % len(DEFAULT_COLORS)]
             max_sort += 1
             conn.execute(
-                """INSERT INTO kids (name, short_name, color, parent, sort_order, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (name, short_name, color, parent, max_sort, now_iso()),
+                """INSERT INTO kids (name, short_name, color, parent, family, sort_order, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (name, short_name, color, parent, family, max_sort, now_iso()),
             )
             existing_names.add(name.lower())
             color_i += 1
@@ -260,7 +286,7 @@ def save_extraction(upload_id: int, payload: dict, status: str = "reviewed") -> 
 def list_events(kid_id: int | None = None, upcoming_only: bool = False) -> list[dict]:
     sql = """
         SELECT e.*, k.name AS kid_name, k.color AS kid_color, k.short_name AS kid_short,
-               k.parent AS parent_name
+               k.parent AS parent_name, k.family AS family_name
         FROM events e
         JOIN kids k ON k.id = e.kid_id
     """

@@ -14,19 +14,33 @@
 <p class="flash">Confirmed {{ request.query_params.get('added') }} event{{ 's' if request.query_params.get('added') != '1' else '' }}. They’re on the board.</p>
 {% endif %}
 
-<div class="filters">
-  <a class="chip {% if not active_kid and not active_parent %}on{% endif %}" href="/">Everyone</a>
-  {% for group in kid_groups %}
-  <a class="chip {% if active_parent == group.parent %}on{% endif %}" href="/?parent={{ group.parent }}" style="--kid: {{ group.kids[0].color }}">{{ group.parent }}</a>
+<div class="family-switch">
+  {% for fam in families %}
+  <a class="family-pill {% if active_family == fam %}on{% endif %}" href="/?family={{ fam }}">{{ fam }}</a>
   {% endfor %}
 </div>
-<div class="filters tight">
-  {% for k in kids %}
-    {% if not active_parent or k.parent == active_parent %}
-    <a class="chip {% if active_kid == k.id %}on{% endif %}" href="/?kid={{ k.id }}" style="--kid: {{ k.color }}">{{ k.name }}</a>
+
+{% if roster_open %}
+<p class="roster-toggle"><a href="/?family={{ active_family }}">Collapse roster ▴</a></p>
+<div class="filters">
+  {% for group in kid_groups %}
+    {% if (group.kids[0].family or 'Sudyk') == active_family %}
+    <a class="chip {% if active_parent == group.parent %}on{% endif %}" href="/?family={{ active_family }}&parent={{ group.parent }}&expand=1" style="--kid: {{ group.kids[0].color }}">{{ group.parent }}</a>
     {% endif %}
   {% endfor %}
 </div>
+{% if active_parent %}
+<div class="filters tight">
+  {% for k in kids %}
+    {% if k.parent == active_parent and (k.family or 'Sudyk') == active_family %}
+    <a class="chip {% if active_kid == k.id %}on{% endif %}" href="/?family={{ active_family }}&parent={{ active_parent }}&kid={{ k.id }}&expand=1" style="--kid: {{ k.color }}">{{ k.name }}</a>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% else %}
+<p class="roster-toggle"><a href="/?family={{ active_family }}&expand=1">Expand roster ▾</a></p>
+{% endif %}
 
 {% if events %}
 <details class="cal-mini">

@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from .db import (
     DATA_DIR,
+    FAMILIES,
     UPLOAD_DIR,
     add_event,
     add_kid,
@@ -120,6 +121,7 @@ def ctx(request: Request, **extra):
         "timezone": TIMEZONE,
         "kids": kids,
         "kid_groups": kids_grouped(kids),
+        "families": FAMILIES,
         "logged_in": logged_in(request),
     }
     data.update(extra)
@@ -161,13 +163,27 @@ def logout(request: Request):
 
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request, kid: int | None = None, parent: str | None = None):
+def home(
+    request: Request,
+    kid: int | None = None,
+    parent: str | None = None,
+    family: str | None = None,
+    expand: int | None = None,
+):
     if not logged_in(request):
         return templates.TemplateResponse(request, "login.html", ctx(request, error=None))
+    active_family = family or "Sudyk"
+    if active_family.lower().replace(" ", "") in {"vanderveen", "vanderveen"}:
+        active_family = "Vander Veen"
+    elif active_family.lower() == "sudyk":
+        active_family = "Sudyk"
     events = list_events(kid_id=kid, upcoming_only=True)
-    if parent:
-        events = [e for e in events if (e.get("parent_name") or "") == parent]
+    if not kid:
+        events = [e for e in events if (e.get("family_name") or "Sudyk") == active_family]
+        if parent:
+            events = [e for e in events if (e.get("parent_name") or "") == parent]
     grouped = _group_events(events)
+    roster_open = bool(expand) or bool(parent) or bool(kid)
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -177,6 +193,8 @@ def home(request: Request, kid: int | None = None, parent: str | None = None):
             grouped=grouped,
             active_kid=kid,
             active_parent=parent,
+            active_family=active_family,
+            roster_open=roster_open,
             calendar_url=f"/calendar.ics?token={CAL_TOKEN}",
             kid_calendar_url=(
                 f"/calendar/{kid}.ics?token={CAL_TOKEN}" if kid else None
@@ -199,12 +217,18 @@ def kids_add(
     name: str = Form(...),
     color: str = Form("#2F6F4E"),
     parent: str = Form(""),
+    family: str = Form("Sudyk"),
 ):
     gate = require_login(request)
     if gate:
         return gate
     if name.strip():
-        add_kid(name.strip(), color.strip() or COLORS[0], parent=parent.strip() or None)
+        add_kid(
+            name.strip(),
+            color.strip() or COLORS[0],
+            parent=parent.strip() or None,
+            family=family.strip() or "Sudyk",
+        )
     return RedirectResponse("/kids", status_code=303)
 
 

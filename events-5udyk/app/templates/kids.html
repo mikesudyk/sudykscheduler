@@ -14,7 +14,7 @@
 {% endif %}
 
 {% for group in kid_groups %}
-<h2>{{ group.parent }}</h2>
+<h2>{{ group.parent }}{% if group.kids[0].family %} · {{ group.kids[0].family }}{% endif %}</h2>
 <ul class="kid-list">
   {% for k in group.kids %}
   <li>
@@ -42,14 +42,21 @@
     <input type="text" name="name" required placeholder="First name" autocomplete="off">
   </label>
   <label>
-    Parent
-    <select name="parent">
-      <option value="">—</option>
-      <option>Mike</option>
-      <option>Laura</option>
-      <option>Jen</option>
-      <option>Dave</option>
+    Family
+    <select name="family">
+      {% for fam in families %}
+      <option value="{{ fam }}">{{ fam }}</option>
+      {% endfor %}
     </select>
+  </label>
+  <label>
+    Parent
+    <input type="text" name="parent" placeholder="Mike, Laura, or an in-law name" list="parent-names">
+    <datalist id="parent-names">
+      {% for group in kid_groups %}
+      <option value="{{ group.parent }}"></option>
+      {% endfor %}
+    </datalist>
   </label>
   <label>
     Color on the calendar
