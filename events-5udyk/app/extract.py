@@ -6,6 +6,7 @@ from pathlib import Path
 
 import httpx
 from pypdf import PdfReader
+from PIL import Image, ImageOps
 
 EXTRACT_PROMPT = """You extract youth sports schedules from a parent-uploaded photo or PDF.
 
@@ -108,6 +109,28 @@ def _empty_result(reason: str) -> dict:
     }
 
 
+def _shrink_image(path: Path) -> tuple[bytes, str]:
+    """Downscale phone photos so Grok + Cloudflare finish before a 524."""
+    import io
+
+    raw = path.read_bytes()
+    try:
+        img = Image.open(io.BytesIO(raw))
+        img = ImageOps.exif_transpose(img)
+        img = img.convert("RGB")
+        img.thumbnail((1280, 1280))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=72, optimize=True)
+        out = buf.getvalue()
+        if len(out) < len(raw):
+            return out, "image/jpeg"
+    except Exception as exc:
+        print(f"image shrink skipped: {exc}", flush=True)
+    if len(raw) > 1_500_000:
+        print(f"image still large: {len(raw)} bytes", flush=True)
+    return raw, "image/jpeg"
+
+
 def extract_schedule(
     path: Path,
     mime: str,
@@ -142,13 +165,8 @@ def extract_schedule(
         user_content.append({"type": "text", "text": "Extracted PDF text:\n" + text[:12000]})
 
     if mime.startswith("image/") or path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".heic"}:
-        raw = path.read_bytes()
+        raw, media = _shrink_image(path)
         b64 = base64.b64encode(raw).decode("ascii")
-        media = "image/jpeg"
-        if path.suffix.lower() == ".png":
-            media = "image/png"
-        elif path.suffix.lower() == ".webp":
-            media = "image/webp"
         user_content.append(
             {"type": "image_url", "image_url": {"url": f"data:{media};base64,{b64}"}}
         )
@@ -161,7 +179,7 @@ def extract_schedule(
         )
 
     models = []
-    for m in (model, "grok-4.6", "grok-4.5"):
+    for m in (model, "grok-4.6"):
         if m and m not in models:
             models.append(m)
 
@@ -180,11 +198,13 @@ def extract_schedule(
                         {"role": "user", "content": user_content},
                     ],
                 },
-                timeout=90.0,
+                timeout=55.0,
             )
             print(f"xAI {try_model} HTTP {r.status_code} {r.text[:400]}", flush=True)
             if r.status_code >= 400:
                 last_err = f"{try_model} HTTP {r.status_code}: {r.text[:300]}"
+                if r.status_code not in (400, 404):
+                    break
                 continue
             content = (r.json().get("choices") or [{}])[0].get("message", {}).get("content")
             if not content:
@@ -194,6 +214,10 @@ def extract_schedule(
             ai = _filter_to_team(ai, team_name)
             ai["reader"] = f"grok:{try_model}"
             return ai
+        except httpx.TimeoutException:
+            last_err = "Grok timed out reading the photo. Crop to just the schedule grid and try again."
+            print(f"xAI timeout {try_model}", flush=True)
+            break
         except Exception as exc:
             last_err = f"{try_model}: {exc}"
             print(f"xAI error {last_err}", flush=True)
