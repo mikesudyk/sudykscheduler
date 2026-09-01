@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Reading schedule · {{ app_name }}{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <div>
+    <p class="eyebrow">{% if kid %}{{ kid.name }}{% endif %}</p>
+    <h1>Reading the schedule</h1>
+    <p class="lede">Grok is looking at the photo. This page refreshes by itself — keep it open.</p>
+  </div>
+</section>
+<p class="flash">Usually 10–30 seconds. A busy photo can take a minute.</p>
+<script>
+setTimeout(() => location.reload(), 2500);
+</script>
+{% endblock %}

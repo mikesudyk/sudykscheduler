@@ -1,5 +1,6 @@
 import os
 import secrets
+import threading
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -282,22 +283,49 @@ async def add_upload_file(
             )
         dest.write_bytes(raw)
         upload_id = add_upload(kid_id, stored, file.filename or stored, file.content_type or "")
-        result = extract_schedule(
-            dest,
-            file.content_type or "",
-            kid["name"],
-            TIMEZONE,
-            parent_name=kid.get("parent") or "",
-            sport=sport.strip(),
-            team_name=team_name.strip(),
-            extra_notes=extra_notes.strip(),
+        save_extraction(
+            upload_id,
+            {
+                "pending": True,
+                "sport": sport.strip(),
+                "team_name": team_name.strip(),
+                "parent_notes": extra_notes.strip(),
+            },
+            status="pending",
         )
-        if team_name.strip():
-            result["team_name"] = result.get("team_name") or team_name.strip()
-        if sport.strip():
-            result["sport"] = sport.strip()
-        result["parent_notes"] = extra_notes.strip()
-        save_extraction(upload_id, result, status="extracted")
+
+        def _run():
+            try:
+                result = extract_schedule(
+                    dest,
+                    file.content_type or "",
+                    kid["name"],
+                    TIMEZONE,
+                    parent_name=kid.get("parent") or "",
+                    sport=sport.strip(),
+                    team_name=team_name.strip(),
+                    extra_notes=extra_notes.strip(),
+                )
+                if team_name.strip():
+                    result["team_name"] = result.get("team_name") or team_name.strip()
+                if sport.strip():
+                    result["sport"] = sport.strip()
+                result["parent_notes"] = extra_notes.strip()
+                save_extraction(upload_id, result, status="extracted")
+            except Exception as exc:
+                save_extraction(
+                    upload_id,
+                    {
+                        "summary": f"Grok failed: {exc}",
+                        "error": str(exc),
+                        "reader": "failed",
+                        "events": [],
+                        "questions": [],
+                    },
+                    status="extracted",
+                )
+
+        threading.Thread(target=_run, daemon=True).start()
         return RedirectResponse(f"/review/{upload_id}", status_code=303)
     except Exception as exc:
         return templates.TemplateResponse(
@@ -323,6 +351,12 @@ def review_page(request: Request, upload_id: int):
     import json
 
     payload = json.loads(upload["extraction_json"] or "{}")
+    if upload.get("status") == "pending":
+        return templates.TemplateResponse(
+            request,
+            "waiting.html",
+            ctx(request, upload=upload, kid=kid),
+        )
     return templates.TemplateResponse(
         request,
         "review.html",

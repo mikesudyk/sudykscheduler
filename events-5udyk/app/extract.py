@@ -118,9 +118,9 @@ def _shrink_image(path: Path) -> tuple[bytes, str]:
         img = Image.open(io.BytesIO(raw))
         img = ImageOps.exif_transpose(img)
         img = img.convert("RGB")
-        img.thumbnail((1280, 1280))
+        img.thumbnail((1024, 1024))
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=72, optimize=True)
+        img.save(buf, format="JPEG", quality=68, optimize=True)
         out = buf.getvalue()
         if len(out) < len(raw):
             return out, "image/jpeg"
@@ -192,13 +192,14 @@ def extract_schedule(
                 json={
                     "model": try_model,
                     "temperature": 0.1,
+                    "reasoning_effort": "low",
                     "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": "You extract structured youth sports schedules. Return only JSON."},
                         {"role": "user", "content": user_content},
                     ],
                 },
-                timeout=55.0,
+                timeout=90.0,
             )
             print(f"xAI {try_model} HTTP {r.status_code} {r.text[:400]}", flush=True)
             if r.status_code >= 400:
