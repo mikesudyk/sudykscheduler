@@ -1,11 +1,22 @@
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 <form method="post" action="/add" enctype="multipart/form-data" class="stack" id="upload-form">
   <fieldset class="kid-picker">
-    <legend>Whose household?</legend>
-    <div class="picker-grid">
-      {% for group in kid_groups %}
+    <legend>Which family?</legend>
+    <div class="picker-grid one-col">
+      {% for fam in families %}
       <label class="pick">
-        <input type="radio" name="parent_name" value="{{ group.parent }}" required>
+        <input type="radio" name="family_name" value="{{ fam }}" required>
+        {{ fam }}
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <fieldset class="kid-picker" id="parent-field" hidden>
+    <legend>Whose household?</legend>
+    <div class="picker-grid one-col">
+      {% for group in add_groups %}
+      <label class="pick parent-opt is-off" data-family="{{ group.kids[0].family or 'Sudyk' }}">
+        <input type="radio" name="parent_name" value="{{ group.parent }}">
         <span class="dot" style="background: {{ group.kids[0].color }}"></span>
         {{ group.parent }}
       </label>
@@ -13,10 +24,10 @@
     </div>
   </fieldset>
   <fieldset class="kid-picker" id="kid-field" hidden>
-    <legend>Which grandkid?</legend>
-    <div class="picker-grid">
-      {% for k in kids %}
-      <label class="pick kid-opt" data-parent="{{ k.parent }}">
+    <legend>Which kid?</legend>
+    <div class="picker-grid one-col">
+      {% for k in add_roster %}
+      <label class="pick kid-opt is-off" data-family="{{ k.family or 'Sudyk' }}" data-parent="{{ k.parent }}">
         <input type="radio" name="kid_id" value="{{ k.id }}">
         <span class="dot" style="background: {{ k.color }}"></span>
         {{ k.name }}
@@ -24,16 +35,14 @@
       {% endfor %}
     </div>
   </fieldset>
-  <div class="grid-2">
-    <label>
-      Sport
-      <input type="text" name="sport" placeholder="Flag football, soccer…">
-    </label>
-    <label>
-      Team name
-      <input type="text" name="team_name" placeholder="Vikings (Shula 3)">
-    </label>
-  </div>
+  <label>
+    Sport
+    <input type="text" name="sport" placeholder="Flag football, soccer…">
+  </label>
+  <label>
+    Team name
+    <input type="text" name="team_name" placeholder="Vikings (Shula 3)">
+  </label>
   <label>
     Anything else we should know
     <input type="text" name="extra_notes" placeholder="Times are kickoff, not arrival…">
@@ -49,13 +58,39 @@
 (function () {
   const form = document.getElementById('upload-form');
   if (!form) return;
+  const parentField = document.getElementById('parent-field');
   const kidField = document.getElementById('kid-field');
+
+  function show(el, on) {
+    el.classList.toggle('is-off', !on);
+    el.hidden = !on;
+  }
+
+  form.querySelectorAll('input[name="family_name"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      parentField.hidden = false;
+      kidField.hidden = true;
+      form.querySelectorAll('.parent-opt').forEach(opt => {
+        const match = opt.dataset.family === radio.value;
+        show(opt, match);
+        const input = opt.querySelector('input');
+        input.required = match;
+        if (!match) input.checked = false;
+      });
+      form.querySelectorAll('.kid-opt input').forEach(input => {
+        input.required = false;
+        input.checked = false;
+      });
+    });
+  });
+
   form.querySelectorAll('input[name="parent_name"]').forEach(radio => {
     radio.addEventListener('change', () => {
+      const family = (form.querySelector('input[name="family_name"]:checked') || {}).value;
       kidField.hidden = false;
       form.querySelectorAll('.kid-opt').forEach(opt => {
-        const match = opt.dataset.parent === radio.value;
-        opt.hidden = !match;
+        const match = opt.dataset.parent === radio.value && opt.dataset.family === family;
+        show(opt, match);
         const input = opt.querySelector('input');
         input.required = match;
         if (!match) input.checked = false;

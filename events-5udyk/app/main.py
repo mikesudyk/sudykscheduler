@@ -126,6 +126,9 @@ def kids_grouped(kids: list[dict]) -> list[dict]:
 
 def ctx(request: Request, **extra):
     kids = list_kids()
+    roster = []
+    for fam in FAMILIES:
+        roster.extend(list_family_roster(fam))
     data = {
         "request": request,
         "family": FAMILY,
@@ -134,6 +137,8 @@ def ctx(request: Request, **extra):
         "kids": kids,
         "kid_groups": kids_grouped(kids),
         "families": FAMILIES,
+        "add_roster": roster,
+        "add_groups": kids_grouped(roster),
         "logged_in": logged_in(request),
     }
     data.update(extra)
