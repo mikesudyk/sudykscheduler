@@ -28,7 +28,9 @@ from .db import (
     get_upload,
     import_kids_csv,
     init_db,
+    kid_ids_for_family,
     list_events,
+    list_family_roster,
     list_kids,
     save_extraction,
     seed_roster_if_empty,
@@ -41,6 +43,16 @@ load_dotenv(ROOT / ".env")
 ensure_data_dirs()
 
 PASSWORD = os.getenv("SITE_PASSWORD", "change-me")
+VEEN_PASSWORD = os.getenv("VEEN_PASSWORD", "teamveen")
+
+
+def _password_ok(given: str, expected: str) -> bool:
+    if not expected:
+        return False
+    a, b = given.encode("utf-8"), expected.encode("utf-8")
+    if len(a) != len(b):
+        return False
+    return secrets.compare_digest(a, b)
 FAMILY = os.getenv("FAMILY_NAME", "Sudyk")
 TIMEZONE = os.getenv("TIMEZONE", "America/Detroit")
 CAL_TOKEN = os.getenv("CALENDAR_TOKEN", "change-the-calendar-token")
@@ -131,15 +143,21 @@ def ctx(request: Request, **extra):
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     if logged_in(request):
-        return RedirectResponse("/", status_code=303)
+        fam = request.session.get("home_family") or "Sudyk"
+        return RedirectResponse(f"/?family={fam}", status_code=303)
     return templates.TemplateResponse(request, "login.html", ctx(request, error=None))
 
 
 @app.post("/login")
 def login_submit(request: Request, password: str = Form(...)):
-    if secrets.compare_digest(password, PASSWORD):
+    if _password_ok(password, VEEN_PASSWORD):
         request.session["ok"] = True
-        return RedirectResponse("/", status_code=303)
+        request.session["home_family"] = "Vander Veen"
+        return RedirectResponse("/?family=Vander Veen", status_code=303)
+    if _password_ok(password, PASSWORD):
+        request.session["ok"] = True
+        request.session["home_family"] = "Sudyk"
+        return RedirectResponse("/?family=Sudyk", status_code=303)
     return templates.TemplateResponse(
         request, "login.html", ctx(request, error="That password is not right."), status_code=401
     )
@@ -172,18 +190,20 @@ def home(
 ):
     if not logged_in(request):
         return templates.TemplateResponse(request, "login.html", ctx(request, error=None))
-    active_family = family or "Sudyk"
+    active_family = family or request.session.get("home_family") or "Sudyk"
     if active_family.lower().replace(" ", "") in {"vanderveen", "vanderveen"}:
         active_family = "Vander Veen"
     elif active_family.lower() == "sudyk":
         active_family = "Sudyk"
     events = list_events(kid_id=kid, upcoming_only=True)
-    if not kid:
-        events = [e for e in events if (e.get("family_name") or "Sudyk") == active_family]
-        if parent:
-            events = [e for e in events if (e.get("parent_name") or "") == parent]
+    family_ids = kid_ids_for_family(active_family, parent if not kid else None)
+    if kid:
+        events = [e for e in events if e.get("kid_id") == kid]
+    else:
+        events = [e for e in events if e.get("kid_id") in family_ids]
     grouped = _group_events(events)
     roster_open = bool(expand) or bool(parent) or bool(kid)
+    family_kids = list_family_roster(active_family)
     return templates.TemplateResponse(
         request,
         "home.html",
@@ -195,6 +215,8 @@ def home(
             active_parent=parent,
             active_family=active_family,
             roster_open=roster_open,
+            kids=family_kids,
+            kid_groups=kids_grouped(family_kids),
             calendar_url=f"/calendar.ics?token={CAL_TOKEN}",
             kid_calendar_url=(
                 f"/calendar/{kid}.ics?token={CAL_TOKEN}" if kid else None

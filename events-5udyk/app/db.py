@@ -105,9 +105,44 @@ def init_db() -> None:
             """UPDATE kids SET family = 'Sudyk'
                WHERE family IS NULL OR trim(family) = ''"""
         )
+        conn.execute(
+            """UPDATE kids SET parent = 'Mike'
+               WHERE parent = 'April' AND (family = 'Sudyk' OR family IS NULL OR family = '')"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS kid_memberships (
+                kid_id INTEGER NOT NULL,
+                family TEXT NOT NULL,
+                parent TEXT NOT NULL,
+                UNIQUE(kid_id, family, parent),
+                FOREIGN KEY (kid_id) REFERENCES kids(id) ON DELETE CASCADE
+            )"""
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent)
+               SELECT id, COALESCE(NULLIF(family, ''), 'Sudyk'), parent
+               FROM kids WHERE parent IS NOT NULL AND trim(parent) != ''"""
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent)
+               SELECT id, 'Vander Veen', 'April'
+               FROM kids WHERE parent = 'Mike'"""
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent)
+               SELECT id, 'Vander Veen', 'April'
+               FROM kids WHERE lower(name) IN
+               ('elijah','alyssandra','emori','malachi','roman','arielle','azariah')"""
+        )
+        conn.execute(
+            """INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent)
+               SELECT id, 'Sudyk', 'Mike'
+               FROM kids WHERE lower(name) IN
+               ('elijah','alyssandra','emori','malachi','roman','arielle','azariah')"""
+        )
 
 
-PARENT_ORDER = ["Mike", "Laura", "Jen", "Dave"]
+PARENT_ORDER = ["Mike", "Laura", "Jen", "Dave", "April"]
 SUDYK_PARENTS = {"Mike", "Laura", "Jen", "Dave"}
 FAMILIES = ["Sudyk", "Vander Veen"]
 
@@ -145,6 +180,37 @@ def list_kids() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def list_family_roster(family: str) -> list[dict]:
+    """Kids as they appear in one family board (same child can sit under two parents)."""
+    with db() as conn:
+        rows = conn.execute(
+            """SELECT k.*, m.parent AS display_parent, m.family AS display_family
+               FROM kid_memberships m
+               JOIN kids k ON k.id = m.kid_id
+               WHERE m.family = ?
+               ORDER BY m.parent, k.sort_order, k.name""",
+            (family,),
+        ).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["parent"] = d.get("display_parent") or d.get("parent")
+        d["family"] = d.get("display_family") or family
+        out.append(d)
+    return out
+
+
+def kid_ids_for_family(family: str, parent: str | None = None) -> set[int]:
+    sql = "SELECT kid_id FROM kid_memberships WHERE family = ?"
+    params: list = [family]
+    if parent:
+        sql += " AND parent = ?"
+        params.append(parent)
+    with db() as conn:
+        rows = conn.execute(sql, params).fetchall()
+    return {int(r[0]) for r in rows}
+
+
 def get_kid(kid_id: int) -> dict | None:
     with db() as conn:
         row = conn.execute("SELECT * FROM kids WHERE id = ?", (kid_id,)).fetchone()
@@ -172,7 +238,17 @@ def add_kid(
                 now_iso(),
             ),
         )
-        return int(cur.lastrowid)
+        kid_id = int(cur.lastrowid)
+        conn.execute(
+            "INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent) VALUES (?, ?, ?)",
+            (kid_id, fam, (parent or "").strip() or "Unknown"),
+        )
+        if (parent or "").strip() == "Mike":
+            conn.execute(
+                "INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent) VALUES (?, ?, ?)",
+                (kid_id, "Vander Veen", "April"),
+            )
+        return kid_id
 
 
 def find_kid_by_name(name: str) -> dict | None:
@@ -231,6 +307,16 @@ def import_kids_csv(text: str) -> dict:
             if not name or name.lower() in {"name", "grandkid", "child"}:
                 continue
             if name.lower() in existing_names:
+                parent = pick(row, "parent", "household") or None
+                family = infer_family(parent, pick(row, "family", "side", "crew") or None)
+                row_id = conn.execute(
+                    "SELECT id FROM kids WHERE lower(name) = lower(?)", (name,)
+                ).fetchone()
+                if row_id and parent:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent) VALUES (?, ?, ?)",
+                        (row_id[0], family, parent),
+                    )
                 skipped += 1
                 continue
             short_name = pick(row, "short_name", "short", "nickname", "nick") or None
@@ -246,6 +332,11 @@ def import_kids_csv(text: str) -> dict:
                 """INSERT INTO kids (name, short_name, color, parent, family, sort_order, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
                 (name, short_name, color, parent, family, max_sort, now_iso()),
+            )
+            kid_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute(
+                "INSERT OR IGNORE INTO kid_memberships (kid_id, family, parent) VALUES (?, ?, ?)",
+                (kid_id, family, parent or "Unknown"),
             )
             existing_names.add(name.lower())
             color_i += 1
