@@ -203,11 +203,14 @@ def list_family_roster(family: str) -> list[dict]:
                     k.sort_order, k.name""",
             (family,),
         ).fetchall()
+    veen_swap = {"April": "#6B3FA0", "Alyse": "#2F6F4E"}
     out = []
     for r in rows:
         d = dict(r)
         d["parent"] = d.get("display_parent") or d.get("parent")
         d["family"] = d.get("display_family") or family
+        if family == "Vander Veen" and d["parent"] in veen_swap:
+            d["color"] = veen_swap[d["parent"]]
         out.append(d)
     return out
 
