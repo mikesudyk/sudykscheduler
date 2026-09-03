@@ -188,7 +188,19 @@ def list_family_roster(family: str) -> list[dict]:
                FROM kid_memberships m
                JOIN kids k ON k.id = m.kid_id
                WHERE m.family = ?
-               ORDER BY m.parent, k.sort_order, k.name""",
+               ORDER BY CASE m.parent
+                    WHEN 'April' THEN 1
+                    WHEN 'Blake' THEN 2
+                    WHEN 'Amara' THEN 3
+                    WHEN 'Alyse' THEN 4
+                    WHEN 'Luke' THEN 5
+                    WHEN 'Arianna' THEN 6
+                    WHEN 'Mike' THEN 1
+                    WHEN 'Laura' THEN 2
+                    WHEN 'Jen' THEN 3
+                    WHEN 'Dave' THEN 4
+                    ELSE 9 END,
+                    k.sort_order, k.name""",
             (family,),
         ).fetchall()
     out = []
